@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.env
+*.db
+*.sqlite
+.DS_Store
+.mypy_cache/
+.pytest_cache/
+dist/
+build/
+models/*.pt
+models/*.onnx
+alembic/versions/*.py
+!alembic/versions/.gitkeep

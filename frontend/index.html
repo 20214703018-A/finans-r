@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Finansör – AI Market Pattern Scanner</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;600;700&display=swap');
+  body{font-family:Inter,system-ui,sans-serif}
+  .mono{font-family:JetBrains Mono,monospace}
+  .glass{backdrop-filter:blur(12px)}
+</style>
+</head>
+<body class="bg-[#0b0f14] text-zinc-100 min-h-screen">
+<!-- topbar -->
+<header class="sticky top-0 z-40 bg-[#0b0f14]/80 glass border-b border-zinc-800">
+  <div class="max-w-[1400px] mx-auto px-4 py-3 flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 grid place-items-center font-bold">F</div>
+      <div>
+        <div class="font-bold leading-none">Finansör</div>
+        <div class="text-xs text-zinc-400">AI Market Pattern Scanner · MVP</div>
+      </div>
+      <span id="yoloBadge" class="ml-3 text-xs px-2 py-1 rounded-full bg-zinc-800 border border-zinc-700">YOLO: kontrol ediliyor…</span>
+    </div>
+    <div class="flex items-center gap-2 text-xs">
+      <a href="/docs" target="_blank" class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700"><i class="fa-solid fa-book mr-1"></i> API Docs</a>
+      <a href="https://huggingface.co/foduucom/stockmarket-pattern-detection-yolov8" target="_blank" class="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500"><i class="fa-solid fa-brain mr-1"></i> HF Model</a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-[1400px] mx-auto px-4 py-6">
+  <!-- controls -->
+  <section class="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 md:p-5">
+    <div class="flex flex-wrap gap-3 items-end">
+      <div class="flex-1 min-w-[160px]">
+        <label class="text-xs text-zinc-400">Sembol</label>
+        <select id="symbol" class="w-full mt-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm"></select>
+      </div>
+      <div class="w-[120px]">
+        <label class="text-xs text-zinc-400">Timeframe</label>
+        <select id="timeframe" class="w-full mt-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm">
+          <option value="15m">15m</option>
+          <option value="1h" selected>1H</option>
+          <option value="4h">4H</option>
+          <option value="1d">1D</option>
+        </select>
+      </div>
+      <div class="w-[110px]">
+        <label class="text-xs text-zinc-400">Limit</label>
+        <input id="limit" type="number" min="50" max="500" value="300" class="w-full mt-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm mono" />
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        <button id="btnAnalyze" class="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 font-semibold text-sm"><i class="fa-solid fa-magnifying-glass-chart mr-1"></i> Analiz Et</button>
+        <button id="btnYolo" class="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-sm"><i class="fa-solid fa-eye mr-1"></i> Yalnız YOLO</button>
+        <button id="btnScan" class="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-sm"><i class="fa-solid fa-radar mr-1"></i> Tara (4 hisse)</button>
+      </div>
+      <div class="ml-auto flex items-center gap-2 text-xs text-zinc-400">
+        <span id="scanInfo" class="hidden"></span>
+        <button id="btnChart" class="px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 hover:bg-zinc-800"><i class="fa-solid fa-chart-line mr-1"></i> Chart</button>
+      </div>
+    </div>
+
+    <!-- quick symbol pills -->
+    <div id="pills" class="flex flex-wrap gap-1.5 mt-3"></div>
+
+    <!-- scan multi select (collapsible) -->
+    <div id="scanBox" class="hidden mt-3 p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+      <div class="text-xs text-zinc-400 mb-2">Taranacak hisseler (max 10)</div>
+      <div id="scanChecks" class="flex flex-wrap gap-2"></div>
+      <div class="flex gap-2 mt-3 items-center">
+        <input id="minScore" type="number" min="0" max="100" value="70" class="w-24 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm mono" />
+        <span class="text-xs text-zinc-400">min skor (watch+)</span>
+        <label class="flex items-center gap-1.5 text-xs ml-2"><input id="includeWeak" type="checkbox" class="rounded"> zayıfı da göster (60+)</label>
+        <button id="btnDoScan" class="ml-auto px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-sm font-semibold">Tara</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- status -->
+  <div id="status" class="mt-4 text-sm text-zinc-400"></div>
+
+  <!-- main grid -->
+  <div class="grid grid-cols-12 gap-5 mt-4">
+    <!-- left: chart + indicators -->
+    <div class="col-span-12 lg:col-span-5 space-y-4">
+      <div class="bg-zinc-900/60 border border-zinc-800 rounded-2xl overflow-hidden">
+        <div class="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+          <div class="font-semibold text-sm"><i class="fa-solid fa-chart-candlestick mr-2 text-violet-400"></i> Chart <span class="text-zinc-400 font-normal mono text-xs">(1280×720, 120 mum, YOLO'nun gördüğü)</span></div>
+          <span id="chartMeta" class="text-xs mono text-zinc-400"></span>
+        </div>
+        <div class="bg-black">
+          <img id="chartImg" alt="chart" class="w-full aspect-[16/9] object-contain hidden" />
+          <img id="yoloImg" alt="yolo" class="w-full aspect-[16/9] object-contain hidden border-t border-zinc-800" />
+          <div id="chartPh" class="aspect-[16/9] grid place-items-center text-zinc-500 text-sm">Analiz ile chart yüklenir</div>
+          <div class="flex gap-1.5 justify-center py-1.5 bg-zinc-950 border-t border-zinc-800 text-xs">
+            <button id="tabChart" class="px-2.5 py-1 rounded-full bg-violet-600 text-white">Temiz Chart</button>
+            <button id="tabYolo" class="px-2.5 py-1 rounded-full bg-zinc-800 border border-zinc-700">YOLO Kutulu</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="indicatorsCard" class="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 hidden">
+        <div class="font-semibold text-sm mb-3"><i class="fa-solid fa-wave-square mr-2 text-emerald-400"></i> Göstergeler</div>
+        <div id="indicators" class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm mono"></div>
+        <div id="regimeBox" class="mt-3 text-xs"></div>
+      </div>
+
+      <div id="qualityCard" class="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 hidden">
+        <div class="font-semibold text-sm mb-2"><i class="fa-solid fa-shield-halved mr-2 text-sky-400"></i> Data Quality</div>
+        <div id="quality" class="text-xs mono text-zinc-400"></div>
+      </div>
+    </div>
+
+    <!-- right: patterns -->
+    <div class="col-span-12 lg:col-span-7 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="font-bold">Patternler <span id="patCount" class="ml-2 text-sm font-normal text-zinc-400"></span></h2>
+        <div class="flex gap-1.5">
+          <span class="px-2 py-1 rounded-full text-xs bg-red-900/40 border border-red-800">60 altı discard</span>
+          <span class="px-2 py-1 rounded-full text-xs bg-amber-900/40 border border-amber-800">70 watch</span>
+          <span class="px-2 py-1 rounded-full text-xs bg-emerald-900/40 border border-emerald-800">80+ strong</span>
+        </div>
+      </div>
+      <div id="patterns" class="space-y-3"></div>
+      <div id="scanResults" class="hidden space-y-3"></div>
+    </div>
+  </div>
+
+  <!-- indicator signal (formasyon yoksa) -->
+  <div id="indicatorSignal" class="hidden mt-5 bg-gradient-to-br from-violet-950/40 to-indigo-950/40 border border-violet-800 rounded-2xl p-4">
+    <div class="font-semibold text-sm mb-2"><i class="fa-solid fa-bolt mr-2 text-amber-400"></i> Gösterge Sinyali (formasyon yoksa fırsat) · RSI + MACD + ADX + RVOL + VWAP</div>
+    <div id="indicatorSignalBody" class="text-sm mono"></div>
+  </div>
+  <!-- yolo preview card -->
+  <div id="yoloPreview" class="hidden mt-5 bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4">
+    <div class="font-semibold text-sm mb-2"><i class="fa-solid fa-eye mr-2 text-violet-400"></i> YOLO Görsel Teyit Detayı</div>
+    <div id="yoloPreviewBody" class="text-sm mono"></div>
+    <div id="yoloBoxDetails" class="mt-3 text-xs mono bg-zinc-950 border border-zinc-800 rounded-xl p-3 hidden"></div>
+  </div>
+</main>
+
+<footer class="max-w-[1400px] mx-auto px-4 py-6 text-xs text-zinc-500">
+  <span class="mono">app/pipeline.py:18</span> sayısal motor önce · YOLO ikinci görüş <span class="mono">app/vision/yolo.py:22</span> · LLM açıklama katmanı `+` Kraken `app/providers/kraken.py:1` · BIST stub.
+</footer>
+
+<script>
+const $ = s => document.querySelector(s);
+const symbolSel = $('#symbol'), timeframeSel = $('#timeframe'), limitIn = $('#limit');
+const btnAnalyze = $('#btnAnalyze'), btnYolo = $('#btnYolo'), btnScan = $('#btnScan'), btnDoScan = $('#btnDoScan'), btnChart = $('#btnChart');
+const pills = $('#pills'), scanBox = $('#scanBox'), scanChecks = $('#scanChecks'), scanInfo = $('#scanInfo');
+const statusEl = $('#status'), chartImg = $('#chartImg'), yoloImg = $('#yoloImg'), tabChart = $('#tabChart'), tabYolo = $('#tabYolo'), chartPh = $('#chartPh'), chartMeta = $('#chartMeta');
+const indicatorsCard = $('#indicatorsCard'), indicatorsEl = $('#indicators'), regimeBox = $('#regimeBox');
+const qualityCard = $('#qualityCard'), qualityEl = $('#quality');
+const patternsEl = $('#patterns'), patCount = $('#patCount'), scanResults = $('#scanResults');
+const yoloBadge = $('#yoloBadge'), yoloPreview = $('#yoloPreview'), yoloPreviewBody = $('#yoloPreviewBody'), yoloBoxDetails = $('#yoloBoxDetails');
+const indicatorSignalEl = $('#indicatorSignal'), indicatorSignalBody = $('#indicatorSignalBody');
+
+let ALL_ASSETS = [];
+let SELECTED_SCAN = new Set(['BTCUSD','ETHUSD','SOLUSD','AVAXUSD']);
+
+async function api(path, opts){ const r=await fetch(path, opts); if(!r.ok) throw new Error(await r.text()); return r.json(); }
+
+async function loadAssets(){
+  try{ const a = await api('/assets'); ALL_ASSETS = a;
+  } catch{ ALL_ASSETS = [{id:'BTCUSD.KRAKEN',symbol:'BTCUSD'},{id:'ETHUSD.KRAKEN',symbol:'ETHUSD'},{id:'SOLUSD.KRAKEN',symbol:'SOLUSD'}]; }
+  const syms = [...new Set(ALL_ASSETS.map(x=>x.symbol))].slice(0,20);
+  symbolSel.innerHTML = syms.map(s=>`<option value="${s}" ${s==='BTCUSD'?'selected':''}>${s}</option>`).join('');
+  pills.innerHTML = syms.map(s=>`<button data-s="${s}" class="pill px-2.5 py-1 rounded-full text-xs bg-zinc-800 border border-zinc-700 hover:bg-zinc-700">${s}</button>`).join('');
+  pills.querySelectorAll('.pill').forEach(b=>b.onclick=()=>{ symbolSel.value=b.dataset.s; });
+  // scan checks
+  scanChecks.innerHTML = syms.map(s=>`<label class="flex items-center gap-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-full px-2.5 py-1.5 cursor-pointer"><input type="checkbox" value="${s}" ${SELECTED_SCAN.has(s)?'checked':''}> ${s}</label>`).join('');
+  scanChecks.querySelectorAll('input').forEach(inp=>inp.onchange=e=>{
+    if(e.target.checked) SELECTED_SCAN.add(e.target.value); else SELECTED_SCAN.delete(e.target.value);
+  });
+}
+
+async function loadYoloStatus(){
+  try{
+    const j = await api('/assets/yolo/status');
+    const ok = j.available;
+    yoloBadge.textContent = ok ? `YOLO ✓ ${j.labels?.length||6} sınıf (${j.labels?.join(', ').slice(0,60)}…)` : `YOLO ✗ ${j.error||'model missing'}`;
+    yoloBadge.className = 'ml-3 text-xs px-2 py-1 rounded-full border ' + (ok?'bg-emerald-900/30 border-emerald-800 text-emerald-300':'bg-amber-900/30 border-amber-800 text-amber-300');
+  }catch(e){ yoloBadge.textContent='YOLO: bilinmiyor'; }
+}
+
+function badgeForLabel(l){
+  const m={discard:'bg-zinc-800 border-zinc-700 text-zinc-300', weak:'bg-amber-900/30 border-amber-800 text-amber-300', watch:'bg-sky-900/30 border-sky-800 text-sky-300', strong:'bg-emerald-900/30 border-emerald-800 text-emerald-300', exceptional:'bg-violet-900/40 border-violet-700 text-violet-300'};
+  return m[l]||m.discard;
+}
+function trendColor(t){ if(t.includes('STRONG_UP')) return 'text-emerald-400'; if(t.includes('UP')) return 'text-emerald-300'; if(t.includes('STRONG_DOWN')) return 'text-red-400'; if(t.includes('DOWN')) return 'text-red-300'; return 'text-zinc-400'; }
+
+function renderIndicators(j){
+  if(!j.indicators){ indicatorsCard.classList.add('hidden'); return; }
+  indicatorsCard.classList.remove('hidden');
+  const ind=j.indicators;
+  const items=[
+    ['close', ind.close], ['EMA20', ind.ema20], ['EMA50', ind.ema50], ['EMA200', ind.ema200],
+    ['RSI', ind.rsi], ['ATR', ind.atr], ['ATR%', ind.atr_pct], ['RVOL', ind.rvol], ['VWAP', ind.vwap],
+  ];
+  indicatorsEl.innerHTML = items.map(([k,v])=>`<div class="bg-zinc-950 border border-zinc-800 rounded-xl p-2"><div class="text-[11px] text-zinc-500">${k}</div><div class="font-semibold">${v==null?'<span class=text-zinc-600>-</span>':(+v).toLocaleString('tr-TR',{maximumFractionDigits:2})}</div></div>`).join('') +
+    `<div class="col-span-2 md:col-span-3 flex gap-2 mt-1"><span class="px-2 py-1 rounded-full text-xs border ${ind.trend.includes('UP')?'bg-emerald-900/30 border-emerald-800 text-emerald-300': ind.trend.includes('DOWN')?'bg-red-900/30 border-red-800 text-red-300':'bg-zinc-800 border-zinc-700'}">${ind.trend}</span><span class="px-2 py-1 rounded-full text-xs bg-zinc-800 border border-zinc-700">${ind.regime?.regime||''} ${ind.regime?.volatility||''}</span><span class="text-xs text-zinc-500 mono">${ind.timestamp||''}</span></div>`;
+  regimeBox.innerHTML = `<span class="text-zinc-500">ADX ${ind.adx?.toFixed?.(1) ?? '-'} · slope ${ind.regime?.ema20_slope?.toFixed?.(3) ?? '-'}</span>`;
+  qualityCard.classList.remove('hidden');
+  qualityEl.textContent = `ok=${j.quality?.ok} dup=${j.quality?.duplicate_count} nan=${j.quality?.nan_count} missing~${j.quality?.missing_count} warnings: ${(j.quality?.warnings||[]).join(' ')||'-'}`;
+}
+
+function barPct(v,max){ return Math.min(100, Math.max(0, (v/max)*100)); }
+
+function patternCard(p){
+  const s=p.scores, y=p.yolo, b=p.breakout;
+  const yTitle = y?.available ? `${y.pattern||'-'} ${y.confidence?(y.confidence*100).toFixed(1)+'%':''} bbox:${y.all_detections?.[0]?.bbox?.map(x=>x.toFixed(0)).join(',')||'-'}` : (y?.reason||'model yok');
+  const yBadge = y?.available
+    ? (y.is_confirmation===true ? `<span title="${yTitle}" class="px-1.5 py-0.5 rounded bg-emerald-900/40 border border-emerald-700 text-emerald-300">YOLO ✓ ${y.pattern} ${(y.confidence*100).toFixed(0)}%</span>`
+       : y.is_confirmation===false ? `<span title="${yTitle}" class="px-1.5 py-0.5 rounded bg-red-900/30 border border-red-800 text-red-300">YOLO ✗ ${y.pattern||'-'} ${y.confidence?(y.confidence*100).toFixed(0)+'%':''}</span>`
+       : `<span title="${yTitle}" class="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700">YOLO - ${y.pattern||'yok'}</span>`)
+    : `<span title="${y?.reason||''}" class="px-1.5 py-0.5 rounded bg-amber-900/30 border border-amber-800 text-amber-300">YOLO model yok</span>`;
+  const conf = y?.confidence ? (y.confidence*100).toFixed(1)+'%' : '-';
+  const statusColor = p.status==='confirmed' ? 'text-emerald-400' : p.status==='failed'?'text-red-400': p.status==='mature'?'text-sky-400':'text-zinc-400';
+  return `<div class="bg-zinc-900/70 border border-zinc-800 rounded-2xl overflow-hidden">
+    <div class="p-4">
+      <div class="flex flex-wrap gap-2 items-start justify-between">
+        <div class="flex items-center gap-2">
+          <span class="px-2.5 py-1 rounded-full text-xs font-bold border ${badgeForLabel(s.label)}">${s.final} · ${s.label}</span>
+          <span class="font-semibold">${p.pattern_type}</span>
+          <span class="text-xs ${statusColor}">${p.status}</span>
+          ${yBadge}
+          <span class="text-xs mono text-zinc-400">${y?.pattern||''} ${conf}</span>
+        </div>
+        <div class="text-xs mono text-zinc-400">geom ${p.geometry_score} · ${Object.entries(p.indices||{}).map(([k,v])=>k+':'+v).join(' ')}</div>
+      </div>
+
+      <div class="grid grid-cols-7 gap-1.5 mt-3">
+        ${[['geom',s.geometry,30],['breakout',s.breakout,20],['volume',s.volume,15],['trend',s.trend,15],['mom',s.momentum,10],['yolo',s.yolo,5],['S/R',s.support_resistance,5]].map(([k,v,mx])=>`
+          <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-center">
+            <div class="text-[11px] text-zinc-500">${k}</div>
+            <div class="font-bold mono text-sm">${v}</div>
+            <div class="h-1 bg-zinc-800 rounded-full mt-1 overflow-hidden"><div class="h-full bg-violet-600" style="width:${barPct(v,mx)}%"></div></div>
+          </div>`).join('')}
+      </div>
+
+      <div class="grid grid-cols-4 gap-2 mt-3 text-xs mono">
+        <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-2"><div class="text-zinc-500">Giriş (${p.trading_plan?.timeframe||timeframeSel.value})</div><div class="font-semibold text-sky-300">${p.trading_plan?.entry?.toFixed?.(2) ?? '-'} <span class="text-[10px]">${p.trading_plan?.direction||''}</span></div><div class="text-[10px] text-zinc-500">${p.trading_plan?.entry_note||''}</div></div>
+        <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-2"><div class="text-zinc-500">Stop</div><div class="font-semibold text-red-300">${p.trading_plan?.stop?.toFixed?.(2) ?? p.invalidation?.toFixed?.(2) ?? '-'}</div><div class="text-[10px] text-zinc-500">RR ${p.trading_plan?.rr ?? '-'} · risk ${p.trading_plan?.risk} → ${p.trading_plan?.reward}</div></div>
+        <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-2"><div class="text-zinc-500">Hedef · Süre (${p.trading_plan?.timeframe||''})</div><div class="font-semibold text-emerald-300">${p.trading_plan?.target?.toFixed?.(2) ?? p.target?.toFixed?.(2) ?? '-'}</div><div class="text-[10px] text-violet-300">${p.trading_plan?.est_duration||''} · ${p.trading_plan?.est_bars||''} bar</div><div class="text-[10px] text-zinc-500">${p.trading_plan?.target_note||''}</div></div>
+        <div class="bg-zinc-950 border ${p.trading_plan?.is_actionable?'border-emerald-700 bg-emerald-950/30':'border-zinc-800'} rounded-xl p-2"><div class="text-zinc-500">Durum · Pencere</div><div class="font-bold ${p.trading_plan?.is_actionable?'text-emerald-400':'text-amber-300'}">${p.trading_plan?.is_actionable?'✓ Geçerli':'○ Beklemede'} ${p.trading_plan?.needs||p.status}</div><div class="text-[10px] text-zinc-400">${p.trading_plan?.valid_until||''}</div></div>
+      </div>
+      <div class="mt-2 bg-zinc-950 border border-zinc-800 rounded-xl p-2.5">
+        <div class="text-xs font-semibold mb-1.5"><i class="fa-solid fa-list-check mr-1 text-violet-400"></i> Alım Kriterleri (7/7 yeşil ise gerçeğe en yakın)</div>
+        <div class="flex flex-wrap gap-1.5">
+          ${(p.trading_plan?.criteria||[]).map(c=>`<span class="px-2 py-1 rounded-full text-xs border ${c.ok?'bg-emerald-900/40 border-emerald-700 text-emerald-300':'bg-zinc-800 border-zinc-700 text-zinc-400'}">${c.ok?'✓':'○'} ${c.k} <span class="mono text-[10px]">${c.val}</span></span>`).join('')}
+        </div>
+        <div class="text-xs mono text-zinc-500 mt-1.5">Nerede geçerli: ${p.trading_plan?.valid_where||'-'} · Nerede geçersiz: ${p.trading_plan?.invalid_where||'-'} · Pencere: ${p.trading_plan?.valid_until||''} · Grafik: ${p.trading_plan?.chart_window||''} (${p.trading_plan?.timeframe||''}) · yeşil ${p.trading_plan?.green_count||0}/7</div>
+      </div>
+      <div class="mt-2 bg-${p.age?.freshness>=0.6?'emerald':'amber'}-950/30 border border-${p.age?.freshness>=0.6?'emerald':'amber'}-800 rounded-xl p-2.5">
+        <div class="text-xs font-semibold mb-1"><i class="fa-solid fa-clock mr-1 ${p.age?.freshness>=0.6?'text-emerald-400':'text-amber-400'}"></i> Yaş: ${p.age?.age_label||'-'} · ${p.age?.fresh_label||''} ${p.age?.age_bars>35? '— 48 mum gibi bayat, skor -4/-8 uygulandı':''}</div>
+        <div class="text-xs mono">Oluşumdan bu yana: <b>${p.age?.change_since_pct ?? '-'}%</b> · max fav ${p.age?.max_fav_pct ?? '-'}% / adv ${p.age?.max_adv_pct ?? '-'}% · ${p.age?.post_label||''}</div>
+        <div class="text-xs text-zinc-400 mt-1">Hedef vuruldu mu: ${p.age?.hit_target?'✓ evet':'○ hayır'} · Stop vuruldu mu: ${p.age?.hit_stop?'✓ evet':'○ hayır'} · Şimdi beklenti: ${p.age?.fresh_label==='taze' ? 'kırılım takibi, giriş ~'+(p.trading_plan?.entry||'') : p.age?.fresh_label==='orta' ? 'yakın takip, hacim teyidi bekle' : 'bayat → yeni formasyon veya gösterge sinyali bekle'}</div>
+      </div>
+      <div class="grid grid-cols-3 gap-3 mt-3 text-xs mono opacity-60">
+        <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-2"><div class="text-zinc-500">neckline (ham)</div><div class="font-semibold">${p.neckline?.toFixed?.(2) ?? '-'}</div></div>
+        <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-2"><div class="text-zinc-500">target (ham)</div><div class="font-semibold">${p.target?.toFixed?.(2) ?? '-'}</div></div>
+        <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-2"><div class="text-zinc-500">invalidation (ham)</div><div class="font-semibold">${p.invalidation?.toFixed?.(2) ?? '-'}</div></div>
+      </div>
+
+      <div class="mt-3 flex flex-wrap gap-2 text-xs">
+        <span class="px-2 py-1 rounded-full bg-zinc-950 border border-zinc-800">breakout <b>${b.quality}</b> ${b.is_breakout?'✓':''} fake=${b.fake_breakout} atr=${Number(b.breakout_strength_atr||0).toFixed(2)}</span>
+        <span class="px-2 py-1 rounded-full bg-zinc-950 border border-zinc-800">rvol ${s.rvol_label||''} ${s.rvol?.toFixed?.(2)||''}</span>
+        <span class="px-2 py-1 rounded-full bg-zinc-950 border border-zinc-800">rsi ${s.rsi?.toFixed?.(1) ?? '-'} ${s.divergence?.bullish_divergence?'↗ bull div': s.divergence?.bearish_divergence?'↘ bear div':''}</span>
+        <span class="px-2 py-1 rounded-full bg-zinc-950 border border-zinc-800">vol_trend ${y?.raw?.label||p.yolo?.raw?.label||''}</span>
+      </div>
+
+      <details class="mt-3">
+        <summary class="text-xs text-violet-400 cursor-pointer">Reasoning (LLM/fallback)</summary>
+        <div class="mt-2 text-sm leading-relaxed bg-zinc-950 border border-zinc-800 rounded-xl p-3 whitespace-pre-wrap">${p.reasoning||''}</div>
+      </details>
+      <details class="mt-2">
+        <summary class="text-xs text-zinc-400 cursor-pointer">Raw</summary>
+        <pre class="mt-2 text-xs mono bg-zinc-950 border border-zinc-800 rounded-xl p-3 overflow-auto">${JSON.stringify({prices:p.prices, breakout:p.breakout, support_resistance:p.support_resistance, yolo:p.yolo},null,2).slice(0,2000)}</pre>
+      </details>
+    </div>
+  </div>`;
+}
+
+let LAST_YOLO_URL = '';
+function renderIndicatorSignal(j){
+  if(!j.indicator_signal){ indicatorSignalEl.classList.add('hidden'); return; }
+  indicatorSignalEl.classList.remove('hidden');
+  const s=j.indicator_signal;
+  indicatorSignalBody.innerHTML = `<div class="flex gap-2 items-center"><span class="px-2.5 py-1 rounded-full text-xs font-bold border ${s.label==='strong'?'bg-emerald-900/40 border-emerald-700 text-emerald-300':'bg-sky-900/30 border-sky-700 text-sky-300'}">${s.score} · ${s.label} · ${s.direction}</span> <span class="text-xs text-zinc-400">RSI ${s.rsi?.toFixed?.(1) ?? '-'} · MACD ${s.macd?.toFixed?.(3) ?? '-'} hist ${s.macd_hist?.toFixed?.(3) ?? '-'}</span></div><div class="mt-2 flex flex-wrap gap-1.5">${s.reasons.map(r=>`<span class="px-2 py-1 rounded-full text-xs bg-zinc-900 border border-zinc-700">${r}</span>`).join('')}</div><div class="text-xs text-zinc-500 mt-2">Göstergeler hep birlikte sinyal üretiyor → formasyon yoksa bile fırsat (deterministik, ${s.timeframe}). Skor <60 ise fırsat sayılmaz.</div>`;
+}
+async function doAnalyze(){
+  const sym = symbolSel.value, tf=timeframeSel.value, lim=parseInt(limitIn.value)||300;
+  statusEl.textContent = `⏳ ${sym} ${tf} analiz ediliyor… (Kraken canlı)`;
+  patternsEl.innerHTML = ''; scanResults.classList.add('hidden'); yoloPreview.classList.add('hidden'); indicatorSignalEl.classList.add('hidden');
+  chartPh.classList.remove('hidden'); chartImg.classList.add('hidden'); yoloImg.classList.add('hidden'); chartMeta.textContent='';
+  try{
+    const j = await api('/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol:sym, timeframe:tf, limit:lim})});
+    statusEl.textContent = `✓ ${sym} ${tf} — ${j.pattern_count} pattern, trend ${j.indicators?.trend}, regime ${j.indicators?.regime?.regime} ` + (j.error?` ⚠ ${j.error}`:'');
+    // chart + yolo annotated
+    const cleanUrl = `/chart?symbol=${sym}&timeframe=${tf}&limit=${lim}&t=${Date.now()}`;
+    const yoloUrl = `/yolo/chart?symbol=${sym}&timeframe=${tf}&limit=${lim}&t=${Date.now()}`;
+    LAST_YOLO_URL = yoloUrl;
+    chartImg.src = cleanUrl;
+    yoloImg.src = yoloUrl;
+    chartImg.onload=()=>{ chartPh.classList.add('hidden'); chartImg.classList.remove('hidden'); showChartTab(); };
+    chartMeta.textContent = `${sym} ${tf} · ${lim} bar — altta YOLO kutulu toggle`;
+    renderIndicators(j);
+    patCount.textContent = `(${j.pattern_count})`;
+    if(!j.patterns.length) patternsEl.innerHTML = `<div class="bg-amber-900/20 border border-amber-800 rounded-2xl p-4 text-sm">Pattern bulunamadı (60 üstü yok). Daha düşük <b>min skor</b> ile Scan dene veya limit/timeframe değiştir.</div>`;
+    else patternsEl.innerHTML = j.patterns.map(patternCard).join('');
+    renderIndicatorSignal(j);
+    // yolo detay için ilk pattern'in yolo'sunu preview kutusuna yaz
+    if(j.patterns[0]?.yolo){
+      const y=j.patterns[0].yolo;
+      yoloPreview.classList.remove('hidden');
+      yoloPreviewBody.innerHTML = `YOLO görsel teyit: <b>${y.pattern||'yok'}</b> ${y.confidence?(y.confidence*100).toFixed(1)+'%':''} — is_confirmation=${y.is_confirmation} — ${y.is_confirmation===true?'✓ sayısal teyit': y.is_confirmation===false?'✗ çelişki': y.is_confirmation===null?'· konum/bayat nedeniyle nötr':'- nötr'} <span class="text-zinc-500">(${y.raw?.label||y.reason||''}) yolo_center ${y.yolo_candle_center??'-'} ↔ pattern ${y.pattern_center??'-'}</span>`;
+      if(y.all_detections?.length){
+        yoloBoxDetails.classList.remove('hidden');
+        yoloBoxDetails.innerHTML = y.all_detections.map(d=> `${d.label} → ${d.canonical||'ignored'}  conf ${(d.confidence*100).toFixed(1)}%  bbox [${d.bbox?.map(x=>x.toFixed(0)).join(', ')}]`).join('<br>');
+      }
+    } else if(j.indicator_signal){
+      yoloPreview.classList.remove('hidden');
+      yoloPreviewBody.innerHTML = `YOLO yok → gösterge sinyali devrede: ${j.indicator_signal.direction} ${j.indicator_signal.score}`;
+    }
+  }catch(e){
+    statusEl.textContent = '✗ Hata: ' + (e.message||e).slice(0,800);
+    console.error(e);
+  }
+}
+function showChartTab(){ chartImg.classList.remove('hidden'); yoloImg.classList.add('hidden'); tabChart.className='px-2.5 py-1 rounded-full bg-violet-600 text-white'; tabYolo.className='px-2.5 py-1 rounded-full bg-zinc-800 border border-zinc-700'; }
+function showYoloTab(){ if(!LAST_YOLO_URL) return; yoloImg.classList.remove('hidden'); chartImg.classList.add('hidden'); chartPh.classList.add('hidden'); tabYolo.className='px-2.5 py-1 rounded-full bg-violet-600 text-white'; tabChart.className='px-2.5 py-1 rounded-full bg-zinc-800 border border-zinc-700'; }
+
+async function doYolo(){
+  const sym=symbolSel.value, tf=timeframeSel.value, lim=parseInt(limitIn.value)||120;
+  statusEl.textContent = `👁 YOLO ${sym} ${tf}…`;
+  try{
+    const j=await api(`/yolo/preview?symbol=${sym}&timeframe=${tf}&limit=${lim}`);
+    yoloPreview.classList.remove('hidden');
+    const y=j.yolo;
+    const annUrl = j.annotated_url + `&t=${Date.now()}`;
+    LAST_YOLO_URL = annUrl;
+    yoloImg.src = annUrl;
+    yoloPreviewBody.innerHTML = `<div>model: ${y.model?.resolved_path||''} ready=${y.available} (${y.model?.labels?.join(', ')||''})</div>
+      <div class="mt-1">pattern=<b>${y.pattern??'-'}</b> conf=${y.confidence? (y.confidence*100).toFixed(1)+'%':'-'} raw=${y.raw?.label||y.raw?.error||'-'}</div>
+      <div class="mt-1">all: ${(y.all_detections||[]).map(d=> `${d.label}→${d.canonical||'ignored'} ${(d.confidence*100).toFixed(1)}% bbox[${d.bbox?.map(x=>x.toFixed(0)).join(',')}]`).join(' · ')||'yok (<0.40)'}</div>
+      <div class="mt-2 grid grid-cols-2 gap-2"><div><div class="text-xs text-zinc-500">Temiz</div><img src="${j.chart_url}&t=${Date.now()}" class="w-full rounded-xl border border-zinc-800 bg-black" /></div><div><div class="text-xs text-violet-400">YOLO Kutulu</div><img src="${annUrl}" class="w-full rounded-xl border border-violet-700 bg-black" /></div></div>`;
+    yoloBoxDetails.classList.remove('hidden');
+    yoloBoxDetails.innerHTML = (y.all_detections||[]).map(d=> `${d.label} → ${d.canonical||'ignored'}  conf ${(d.confidence*100).toFixed(1)}%  bbox [${d.bbox?.map(x=>x.toFixed(0)).join(', ')}]`).join('<br>') || 'tespit yok';
+    // update main chart to annotated toggle
+    chartImg.src = j.chart_url + `&t=${Date.now()}`;
+    yoloImg.src = annUrl;
+    chartImg.onload=()=>{ chartPh.classList.add('hidden'); chartImg.classList.remove('hidden'); showYoloTab(); chartMeta.textContent=`${sym} ${tf} · YOLO ${y.pattern||'yok'}`; };
+    statusEl.textContent = `✓ YOLO ${sym} → ${y.pattern||'yok'} ${y.confidence? (y.confidence*100).toFixed(1)+'%':''}`;
+  }catch(e){ statusEl.textContent='✗ YOLO hata: '+e.message.slice(0,600); }
+}
+
+async function doScan(){
+  const tf=timeframeSel.value, lim=parseInt(limitIn.value)||200;
+  const minScore=parseInt(document.getElementById('minScore').value)||70;
+  const includeWeak=document.getElementById('includeWeak').checked;
+  const syms=[...SELECTED_SCAN];
+  if(!syms.length) return alert('En az 1 hisse seç');
+  statusEl.textContent = `🔍 Scan ${syms.join(', ')} ${tf} min ${minScore}${includeWeak?' weak dahil':''}…`;
+  try{
+    const j=await api('/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbols:syms, timeframe:tf, limit:lim, min_score:minScore, include_weak:includeWeak})});
+    statusEl.textContent = `✓ Scan ${tf} → ${j.total_patterns} pattern (≥${minScore})`;
+    scanResults.classList.remove('hidden'); patternsEl.innerHTML='';
+    patCount.textContent = `scan ${j.total_patterns}`;
+    if(!j.ranked.length){ scanResults.innerHTML = `<div class="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 text-sm">Skor ≥${minScore} pattern yok (zorlama yok — ${includeWeak?'60+ da yok':'watch+ altı gizli, zayıfı görmek için kutuyu işaretle'}).</div>`; return;}
+    scanResults.innerHTML = `<div class="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-3 text-sm mono">Top ${Math.min(10,j.ranked.length)} ranked (skor desc)</div>` +
+      j.ranked.slice(0,20).map(p=> `<div class="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-3 text-sm">
+        <div class="flex gap-2 items-center"><b>${p.symbol}</b> <span class="px-2 py-0.5 rounded-full border ${badgeForLabel(p.scores?.label)} text-xs">${p.final_score} ${p.scores?.label}</span> ${p.pattern_type} ${p.status} <span class="text-zinc-400 mono text-xs">yolo ${p.yolo?.pattern||'-'} ${p.yolo?.confidence? (p.yolo.confidence*100).toFixed(0)+'%':''} ${p.yolo?.is_confirmation===true?'✓':p.yolo?.is_confirmation===false?'✗':''}</span></div>
+        <div class="text-xs mono text-zinc-400 mt-1">${Object.entries(p.scores||{}).filter(([k])=>['geometry','breakout','volume','trend','momentum','yolo','support_resistance'].includes(k)).map(([k,v])=>k+':'+v).join(' · ')}</div>
+      </div>`).join('');
+    // per-symbol breakdown
+    scanResults.innerHTML += `<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">${j.results.map(r=>`<div class="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs mono"><div class="font-semibold">${r.symbol} → ${r.pattern_count} pattern</div><div class="text-zinc-400">${r.indicators? r.indicators.trend+' '+r.indicators.regime?.regime : r.error||''}</div></div>`).join('')}</div>`;
+  }catch(e){ statusEl.textContent='✗ Scan hata: '+e.message.slice(0,800); }
+}
+
+btnAnalyze.onclick=doAnalyze;
+btnYolo.onclick=doYolo;
+btnChart.onclick=()=>{ const s=symbolSel.value,t=timeframeSel.value,l=parseInt(limitIn.value)||120; chartImg.src=`/chart?symbol=${s}&timeframe=${t}&limit=${l}&t=${Date.now()}`; chartPh.classList.add('hidden'); chartImg.classList.remove('hidden'); chartMeta.textContent=`${s} ${t}`; };
+tabChart.onclick=showChartTab;
+tabYolo.onclick=showYoloTab;
+btnScan.onclick=()=>{ scanBox.classList.toggle('hidden'); };
+btnDoScan.onclick=doScan;
+
+loadAssets(); loadYoloStatus();
+symbolSel.onchange=()=>{ chartPh.textContent='Analiz ile chart yüklenir'; };
+setTimeout(doAnalyze, 800);
+</script>
+</body>
+</html>
