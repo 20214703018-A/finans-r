@@ -34,9 +34,16 @@ SYMBOL_PROVIDER_MAP: dict[str, str] = {
 def get_provider_for_symbol(symbol: str) -> MarketDataProvider:
     key = SYMBOL_PROVIDER_MAP.get(symbol)
     if key is None:
-        # Default heuristic: ends with USD -> kraken
-        if symbol.endswith("USD"):
+        # Default heuristic: ends with USD or USDT -> kraken
+        if symbol.endswith("USD") or symbol.endswith("USDT"):
             key = "kraken"
+        elif "/" in symbol:
+            # Handle symbols like BTC/USDT, ETH/USD
+            base = symbol.split("/")[0]
+            if base in ["BTC", "ETH", "SOL", "XRP", "BNB", "DOGE", "ADA", "AVAX", "LINK", "SUI"]:
+                key = "kraken"
+            else:
+                key = "kraken"  # Default to kraken for unknown crypto
         else:
             raise ValueError(f"No provider configured for symbol {symbol}")
     return PROVIDERS[key]

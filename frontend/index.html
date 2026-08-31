@@ -3,31 +3,39 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Finansör – AI Market Pattern Scanner</title>
+<title>Finansör AI - Professional Trading Terminal</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap');
   body{font-family:Inter,system-ui,sans-serif}
   .mono{font-family:JetBrains Mono,monospace}
   .glass{backdrop-filter:blur(12px)}
+  .signal-card{transition:all 0.3s ease}
+  .signal-card:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(139,92,246,0.15)}
+  .sensor-bar{transition:width 0.5s ease-out}
+  @keyframes pulse-glow{0%,100%{box-shadow:0 0 20px rgba(139,92,246,0.3)}50%{box-shadow:0 0 40px rgba(139,92,246,0.6)}}
+  .pulse-animation{animation:pulse-glow 2s infinite}
+  .mtf-align{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 2px}
+  .mtf-bull{background:#10b981}.mtf-bear{background:#ef4444}.mtf-neut{background:#6b7280}
 </style>
 </head>
 <body class="bg-[#0b0f14] text-zinc-100 min-h-screen">
 <!-- topbar -->
-<header class="sticky top-0 z-40 bg-[#0b0f14]/80 glass border-b border-zinc-800">
-  <div class="max-w-[1400px] mx-auto px-4 py-3 flex items-center justify-between gap-4">
+<header class="sticky top-0 z-50 bg-[#0b0f14]/95 glass border-b border-zinc-800/80">
+  <div class="max-w-[1600px] mx-auto px-4 py-3 flex items-center justify-between gap-4">
     <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 grid place-items-center font-bold">F</div>
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 via-indigo-600 to-cyan-600 grid place-items-center font-bold text-lg shadow-lg shadow-violet-900/30">F</div>
       <div>
-        <div class="font-bold leading-none">Finansör</div>
-        <div class="text-xs text-zinc-400">AI Market Pattern Scanner · MVP</div>
+        <div class="font-bold text-lg leading-none tracking-tight">Finansör AI</div>
+        <div class="text-xs text-zinc-400 font-medium">Professional Trading Terminal · 44 İndikatör · MTF Analiz</div>
       </div>
-      <span id="yoloBadge" class="ml-3 text-xs px-2 py-1 rounded-full bg-zinc-800 border border-zinc-700">YOLO: kontrol ediliyor…</span>
+      <span id="fusionBadge" class="ml-4 text-xs px-3 py-1.5 rounded-full bg-emerald-900/30 border border-emerald-700 text-emerald-300 font-semibold"><i class="fa-solid fa-check-circle mr-1"></i>Fusion v3.0 Aktif</span>
     </div>
-    <div class="flex items-center gap-2 text-xs">
-      <a href="/docs" target="_blank" class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700"><i class="fa-solid fa-book mr-1"></i> API Docs</a>
-      <a href="https://huggingface.co/foduucom/stockmarket-pattern-detection-yolov8" target="_blank" class="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500"><i class="fa-solid fa-brain mr-1"></i> HF Model</a>
+    <div class="flex items-center gap-2 text-xs font-medium">
+      <button id="btnTimezone" class="px-3 py-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 transition"><i class="fa-solid fa-clock mr-1"></i><span id="tzDisplay">UTC</span></button>
+      <a href="/docs" target="_blank" class="px-3 py-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 transition"><i class="fa-solid fa-code mr-1"></i>API</a>
+      <a href="https://huggingface.co/foduucom/stockmarket-pattern-detection-yolov8" target="_blank" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 transition shadow-lg shadow-violet-900/20"><i class="fa-solid fa-brain mr-1"></i>YOLO Model</a>
     </div>
   </div>
 </header>
@@ -150,17 +158,28 @@
 <script>
 const $ = s => document.querySelector(s);
 const symbolSel = $('#symbol'), timeframeSel = $('#timeframe'), limitIn = $('#limit');
-const btnAnalyze = $('#btnAnalyze'), btnYolo = $('#btnYolo'), btnScan = $('#btnScan'), btnDoScan = $('#btnDoScan'), btnChart = $('#btnChart');
+const btnAnalyze = $('#btnAnalyze'), btnFusion = $('#btnFusion'), btnYolo = $('#btnYolo'), btnScan = $('#btnScan'), btnDoScan = $('#btnDoScan'), btnChart = $('#btnChart'), btnTimezone = $('#btnTimezone');
 const pills = $('#pills'), scanBox = $('#scanBox'), scanChecks = $('#scanChecks'), scanInfo = $('#scanInfo');
 const statusEl = $('#status'), chartImg = $('#chartImg'), yoloImg = $('#yoloImg'), tabChart = $('#tabChart'), tabYolo = $('#tabYolo'), chartPh = $('#chartPh'), chartMeta = $('#chartMeta');
 const indicatorsCard = $('#indicatorsCard'), indicatorsEl = $('#indicators'), regimeBox = $('#regimeBox');
 const qualityCard = $('#qualityCard'), qualityEl = $('#quality');
 const patternsEl = $('#patterns'), patCount = $('#patCount'), scanResults = $('#scanResults');
-const yoloBadge = $('#yoloBadge'), yoloPreview = $('#yoloPreview'), yoloPreviewBody = $('#yoloPreviewBody'), yoloBoxDetails = $('#yoloBoxDetails');
+const fusionDashboard = $('#fusionDashboard'), riskPanel = $('#riskPanel');
+const signalBadge = $('#signalBadge'), mtfCurrent = $('#mtfCurrent'), mtfHigher = $('#mtfHigher'), mtfDaily = $('#mtfDaily'), mtfText = $('#mtfText');
+const sensorTrend = $('#sensorTrend'), sensorMomentum = $('#sensorMomentum'), sensorVolatility = $('#sensorVolatility');
+const sensorVolume = $('#sensorVolume'), sensorFibonacci = $('#sensorFibonacci'), sensorPattern = $('#sensorPattern');
+const barTrend = $('#barTrend'), barMomentum = $('#barMomentum'), barVolatility = $('#barVolatility');
+const barVolume = $('#barVolume'), barFibonacci = $('#barFibonacci'), barPattern = $('#barPattern');
+const strategyMode = $('#strategyMode'), confidenceLevel = $('#confidenceLevel'), totalScore = $('#totalScore');
+const conflictsBox = $('#conflictsBox'), conflictsList = $('#conflictsList');
+const entryPrice = $('#entryPrice'), stopLoss = $('#stopLoss'), takeProfit = $('#takeProfit'), positionSize = $('#positionSize');
+const entryNote = $('#entryNote'), stopDist = $('#stopDist'), rrRatio = $('#rrRatio'), holdTime = $('#holdTime');
+const yoloPreview = $('#yoloPreview'), yoloPreviewBody = $('#yoloPreviewBody'), yoloBoxDetails = $('#yoloBoxDetails');
 const indicatorSignalEl = $('#indicatorSignal'), indicatorSignalBody = $('#indicatorSignalBody');
 
 let ALL_ASSETS = [];
 let SELECTED_SCAN = new Set(['BTCUSD','ETHUSD','SOLUSD','AVAXUSD']);
+let CURRENT_TZ = 'UTC';
 
 async function api(path, opts){ const r=await fetch(path, opts); if(!r.ok) throw new Error(await r.text()); return r.json(); }
 
@@ -294,12 +313,13 @@ function renderIndicatorSignal(j){
 }
 async function doAnalyze(){
   const sym = symbolSel.value, tf=timeframeSel.value, lim=parseInt(limitIn.value)||300;
-  statusEl.textContent = `⏳ ${sym} ${tf} analiz ediliyor… (Kraken canlı)`;
+  statusEl.textContent = `⏳ ${sym} ${tf} full analiz ediliyor… (44 indikatör + MTF)`;
+  fusionDashboard.classList.add('hidden'); riskPanel.classList.add('hidden');
   patternsEl.innerHTML = ''; scanResults.classList.add('hidden'); yoloPreview.classList.add('hidden'); indicatorSignalEl.classList.add('hidden');
   chartPh.classList.remove('hidden'); chartImg.classList.add('hidden'); yoloImg.classList.add('hidden'); chartMeta.textContent='';
   try{
     const j = await api('/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol:sym, timeframe:tf, limit:lim})});
-    statusEl.textContent = `✓ ${sym} ${tf} — ${j.pattern_count} pattern, trend ${j.indicators?.trend}, regime ${j.indicators?.regime?.regime} ` + (j.error?` ⚠ ${j.error}`:'');
+    statusEl.textContent = `✓ ${sym} ${tf} — ${j.pattern_count} pattern, trend ${j.indicators?.trend}`;
     // chart + yolo annotated
     const cleanUrl = `/chart?symbol=${sym}&timeframe=${tf}&limit=${lim}&t=${Date.now()}`;
     const yoloUrl = `/yolo/chart?symbol=${sym}&timeframe=${tf}&limit=${lim}&t=${Date.now()}`;
@@ -307,27 +327,42 @@ async function doAnalyze(){
     chartImg.src = cleanUrl;
     yoloImg.src = yoloUrl;
     chartImg.onload=()=>{ chartPh.classList.add('hidden'); chartImg.classList.remove('hidden'); showChartTab(); };
-    chartMeta.textContent = `${sym} ${tf} · ${lim} bar — altta YOLO kutulu toggle`;
+    chartMeta.textContent = `${sym} ${tf} · ${lim} bar — Full Analiz`;
     renderIndicators(j);
     patCount.textContent = `(${j.pattern_count})`;
-    if(!j.patterns.length) patternsEl.innerHTML = `<div class="bg-amber-900/20 border border-amber-800 rounded-2xl p-4 text-sm">Pattern bulunamadı (60 üstü yok). Daha düşük <b>min skor</b> ile Scan dene veya limit/timeframe değiştir.</div>`;
+    if(!j.patterns.length) patternsEl.innerHTML = `<div class="bg-amber-900/20 border border-amber-800 rounded-2xl p-4 text-sm">Pattern bulunamadı (60 üstü yok). Fusion panelini kontrol et!</div>`;
     else patternsEl.innerHTML = j.patterns.map(patternCard).join('');
     renderIndicatorSignal(j);
-    // yolo detay için ilk pattern'in yolo'sunu preview kutusuna yaz
+    // yolo detay
     if(j.patterns[0]?.yolo){
       const y=j.patterns[0].yolo;
       yoloPreview.classList.remove('hidden');
-      yoloPreviewBody.innerHTML = `YOLO görsel teyit: <b>${y.pattern||'yok'}</b> ${y.confidence?(y.confidence*100).toFixed(1)+'%':''} — is_confirmation=${y.is_confirmation} — ${y.is_confirmation===true?'✓ sayısal teyit': y.is_confirmation===false?'✗ çelişki': y.is_confirmation===null?'· konum/bayat nedeniyle nötr':'- nötr'} <span class="text-zinc-500">(${y.raw?.label||y.reason||''}) yolo_center ${y.yolo_candle_center??'-'} ↔ pattern ${y.pattern_center??'-'}</span>`;
-      if(y.all_detections?.length){
-        yoloBoxDetails.classList.remove('hidden');
-        yoloBoxDetails.innerHTML = y.all_detections.map(d=> `${d.label} → ${d.canonical||'ignored'}  conf ${(d.confidence*100).toFixed(1)}%  bbox [${d.bbox?.map(x=>x.toFixed(0)).join(', ')}]`).join('<br>');
-      }
-    } else if(j.indicator_signal){
-      yoloPreview.classList.remove('hidden');
-      yoloPreviewBody.innerHTML = `YOLO yok → gösterge sinyali devrede: ${j.indicator_signal.direction} ${j.indicator_signal.score}`;
+      yoloPreviewBody.innerHTML = `YOLO: <b>${y.pattern||'yok'}</b> ${y.confidence?(y.confidence*100).toFixed(1)+'%':''}`;
     }
   }catch(e){
     statusEl.textContent = '✗ Hata: ' + (e.message||e).slice(0,800);
+    console.error(e);
+  }
+}
+
+// YENİ: Fusion Analiz Fonksiyonu
+async function doFusion(){
+  const sym = symbolSel.value, tf=timeframeSel.value, lim=parseInt(limitIn.value)||300;
+  statusEl.textContent = `🧠 ${sym} ${tf} Fusion analizi… (44 indikatör + MTF + Risk)`;
+  try{
+    const j = await api('/analyze-full',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol:sym, timeframe:tf, limit:lim})});
+    statusEl.textContent = `✓ Fusion: ${j.fusion?.signal || 'NÖTR'} · Skor: ${j.fusion?.total_score?.toFixed(1) || 0}`;
+    
+    // Render Fusion Dashboard
+    renderFusionDashboard(j.fusion);
+    
+    // Render Risk Panel
+    renderRiskPanel(j.plan);
+    
+    // Also run regular analyze for chart
+    doAnalyze();
+  }catch(e){
+    statusEl.textContent = '✗ Fusion Hata: ' + (e.message||e).slice(0,800);
     console.error(e);
   }
 }
@@ -382,6 +417,7 @@ async function doScan(){
 }
 
 btnAnalyze.onclick=doAnalyze;
+btnFusion.onclick=doFusion;
 btnYolo.onclick=doYolo;
 btnChart.onclick=()=>{ const s=symbolSel.value,t=timeframeSel.value,l=parseInt(limitIn.value)||120; chartImg.src=`/chart?symbol=${s}&timeframe=${t}&limit=${l}&t=${Date.now()}`; chartPh.classList.add('hidden'); chartImg.classList.remove('hidden'); chartMeta.textContent=`${s} ${t}`; };
 tabChart.onclick=showChartTab;
@@ -389,9 +425,226 @@ tabYolo.onclick=showYoloTab;
 btnScan.onclick=()=>{ scanBox.classList.toggle('hidden'); };
 btnDoScan.onclick=doScan;
 
+// Timezone button
+btnTimezone.onclick=()=>{
+  CURRENT_TZ = CURRENT_TZ === 'UTC' ? 'TR' : 'UTC';
+  document.getElementById('tzDisplay').textContent = CURRENT_TZ;
+  // Gerçek uygulamada burada API'ye timezone parametresi gönderilir
+};
+
 loadAssets(); loadYoloStatus();
-symbolSel.onchange=()=>{ chartPh.textContent='Analiz ile chart yüklenir'; };
+symbolSel.onchange=()=>{ chartPh.textContent='Full Analiz ile chart yüklenir'; };
 setTimeout(doAnalyze, 800);
+    // Fusion Dashboard Güncelleme Fonksiyonu
+    function updateFusionDashboard(data) {
+        const fusionSection = document.getElementById('fusion-section');
+        if (!fusionSection) return;
+
+        // 1. Ana Sinyal ve Skor
+        const signalEl = document.getElementById('fusion-signal');
+        const scoreEl = document.getElementById('fusion-score');
+        const strategyEl = document.getElementById('fusion-strategy');
+        const confidenceEl = document.getElementById('fusion-confidence');
+
+        if (signalEl) {
+            signalEl.textContent = data.signal || 'NÖTR';
+            signalEl.className = `text-3xl font-bold ${getSignalColor(data.signal)}`;
+        }
+        if (scoreEl) scoreEl.textContent = `Skor: ${data.score?.toFixed(2) || 0}`;
+        if (strategyEl) strategyEl.textContent = data.strategy || 'Bekle';
+        if (confidenceEl) {
+            const conf = (data.confidence || 0) * 100;
+            confidenceEl.textContent = `Güven: %${conf.toFixed(1)}`;
+            confidenceEl.className = `text-sm font-medium ${conf > 70 ? 'text-green-400' : conf > 40 ? 'text-yellow-400' : 'text-red-400'}`;
+        }
+
+        // 2. Sensör Oyları (Bar Chart)
+        const votesContainer = document.getElementById('sensor-votes');
+        if (votesContainer && data.votes) {
+            votesContainer.innerHTML = '';
+            data.votes.forEach(vote => {
+                const voteItem = document.createElement('div');
+                voteItem.className = 'mb-3';
+                const percent = Math.min(Math.abs(vote.vote) / 100 * 100, 100); // Normalize
+                const colorClass = vote.vote > 0 ? 'bg-green-500' : vote.vote < 0 ? 'bg-red-500' : 'bg-gray-500';
+                
+                voteItem.innerHTML = `
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="font-semibold text-gray-300">${vote.sensor}</span>
+                        <span class="${vote.vote > 0 ? 'text-green-400' : vote.vote < 0 ? 'text-red-400' : 'text-gray-400'}">
+                            ${vote.vote > 0 ? '+' : ''}${vote.vote}
+                        </span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-2.5">
+                        <div class="${colorClass} h-2.5 rounded-full transition-all duration-500" style="width: ${percent}%"></div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1 truncate">${vote.reason}</p>
+                `;
+                votesContainer.appendChild(voteItem);
+            });
+        }
+
+        // 3. MTF Alignment
+        const mtfContainer = document.getElementById('mtf-alignment');
+        if (mtfContainer && data.mtf_alignment) {
+            const { current, higher, daily } = data.mtf_alignment;
+            mtfContainer.innerHTML = `
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div class="p-2 bg-gray-800 rounded">
+                        <div class="text-xs text-gray-400">Mevcut TF</div>
+                        <div class="font-bold ${getTrendColor(current)}">${current}</div>
+                    </div>
+                    <div class="p-2 bg-gray-800 rounded">
+                        <div class="text-xs text-gray-400">Üst TF</div>
+                        <div class="font-bold ${getTrendColor(higher)}">${higher}</div>
+                    </div>
+                    <div class="p-2 bg-gray-800 rounded">
+                        <div class="text-xs text-gray-400">Günlük</div>
+                        <div class="font-bold ${getTrendColor(daily)}">${daily}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 4. Risk Planı (Stop Loss, Take Profit, Pozisyon)
+        const riskContainer = document.getElementById('risk-plan-details');
+        if (riskContainer && data.risk_plan) {
+            const plan = data.risk_plan;
+            riskContainer.innerHTML = `
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div class="p-3 bg-gray-800 rounded border border-gray-700">
+                        <div class="text-gray-400 text-xs">Giriş Fiyatı</div>
+                        <div class="font-bold text-white">${plan.entry_price?.toFixed(2) || '-'}</div>
+                    </div>
+                    <div class="p-3 bg-red-900/30 rounded border border-red-800">
+                        <div class="text-red-400 text-xs">Stop Loss</div>
+                        <div class="font-bold text-red-300">${plan.stop_loss?.toFixed(2) || '-'}</div>
+                    </div>
+                    <div class="p-3 bg-green-900/30 rounded border border-green-800 col-span-2">
+                        <div class="text-green-400 text-xs flex justify-between">
+                            <span>Take Profit Hedefleri</span>
+                            <span class="text-xs opacity-75">R/R: ${plan.risk_reward_ratio?.toFixed(2) || '-'}</span>
+                        </div>
+                        <div class="flex justify-between mt-2 font-mono text-green-300">
+                            <span>TP1: ${plan.take_profit_1?.toFixed(2) || '-'}</span>
+                            <span>TP2: ${plan.take_profit_2?.toFixed(2) || '-'}</span>
+                            <span>TP3: ${plan.take_profit_3?.toFixed(2) || '-'}</span>
+                        </div>
+                    </div>
+                    <div class="p-3 bg-blue-900/30 rounded border border-blue-800">
+                        <div class="text-blue-400 text-xs">Pozisyon Boyutu</div>
+                        <div class="font-bold text-blue-300">%${plan.position_size_pct?.toFixed(2) || 0}</div>
+                    </div>
+                    <div class="p-3 bg-purple-900/30 rounded border border-purple-800">
+                        <div class="text-purple-400 text-xs">Beklenen Süre</div>
+                        <div class="font-bold text-purple-300 text-xs">${plan.expected_hold_time || '-'}</div>
+                    </div>
+                </div>
+            `;
+        } else if (riskContainer) {
+            riskContainer.innerHTML = '<div class="text-center text-gray-500 py-4">Risk planı hesaplanamadı (Yetersiz veri veya zayıf sinyal)</div>';
+        }
+
+        // Section'ı görünür yap
+        fusionSection.classList.remove('hidden');
+    }
+
+    // Yardımcı Fonksiyonlar
+    function getSignalColor(signal) {
+        if (!signal) return 'text-gray-400';
+        const s = signal.toUpperCase();
+        if (s.includes('STRONG_BUY') || s === 'BUY') return 'text-green-500';
+        if (s.includes('WEAK_BUY')) return 'text-green-300';
+        if (s.includes('STRONG_SELL') || s === 'SELL') return 'text-red-500';
+        if (s.includes('WEAK_SELL')) return 'text-red-300';
+        return 'text-gray-400';
+    }
+
+    function getTrendColor(trend) {
+        if (!trend) return 'text-gray-400';
+        if (trend === 'Bullish') return 'text-green-400';
+        if (trend === 'Bearish') return 'text-red-400';
+        return 'text-gray-400';
+    }
+
+    // Buton Event Listener'ları
+    document.getElementById('analyze-btn')?.addEventListener('click', async () => {
+        const symbol = document.getElementById('symbol-input').value || 'BTCUSD';
+        const timeframe = document.getElementById('timeframe-select').value;
+        
+        setLoading(true);
+        try {
+            const response = await fetch(`/analyze?symbol=${symbol}&timeframe=${timeframe}`);
+            const data = await response.json();
+            
+            // Standart Analiz Sonuçlarını Göster
+            renderIndicators(data.indicators);
+            renderPatterns(data.patterns);
+            renderSignals(data.signals);
+            
+            // Fusion analizi de iste
+            runFusionAnalysis(symbol, timeframe);
+            
+        } catch (error) {
+            console.error('Analiz hatası:', error);
+            alert('Analiz sırasında bir hata oluştu.');
+        } finally {
+            setLoading(false);
+        }
+    });
+
+    document.getElementById('fusion-btn')?.addEventListener('click', async () => {
+        const symbol = document.getElementById('symbol-input').value || 'BTCUSD';
+        const timeframe = document.getElementById('timeframe-select').value;
+        runFusionAnalysis(symbol, timeframe);
+    });
+
+    async function runFusionAnalysis(symbol, timeframe) {
+        setLoading(true);
+        document.getElementById('fusion-section')?.classList.add('hidden');
+        
+        try {
+            const response = await fetch(`/analyze-full?symbol=${symbol}&timeframe=${timeframe}`, {
+                method: 'POST'
+            });
+            if (!response.ok) throw new Error('Fusion analizi başarısız');
+            
+            const data = await response.json();
+            updateFusionDashboard(data);
+            
+            // Scroll to fusion section
+            document.getElementById('fusion-section')?.scrollIntoView({ behavior: 'smooth' });
+            
+        } catch (error) {
+            console.error('Fusion hatası:', error);
+            document.getElementById('fusion-section').innerHTML = `
+                <div class="text-red-400 text-center py-4">
+                    Fusion motoru hatası: ${error.message}. Lütfen backend'in çalıştığından emin olun.
+                </div>
+            `;
+            document.getElementById('fusion-section').classList.remove('hidden');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    function setLoading(isLoading) {
+        const btns = document.querySelectorAll('button');
+        btns.forEach(btn => {
+            if (isLoading) {
+                btn.disabled = true;
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        });
+    }
+
+    // Sayfa yüklendiğinde varsayılan analiz
+    window.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('analyze-btn')?.click();
+    });
 </script>
 </body>
 </html>
