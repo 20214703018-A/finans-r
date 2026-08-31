@@ -107,7 +107,7 @@ async def analyze_full(
     Full Signal Fusion Analysis with Multi-Timeframe Alignment
     
     Uses ALL 44 indicators with adaptive weighting based on timeframe.
-    Returns detailed sensor votes, conflicts, MTF alignment, and strategy mode.
+    Returns detailed sensor votes, conflicts, MTF alignment, strategy mode, and RISK PLAN.
     """
     try:
         # Fetch data using pipeline's provider system
@@ -116,7 +116,15 @@ async def analyze_full(
         from app.indicators import calculate_indicators
         
         provider = get_provider_for_symbol(symbol)
-        bars = await provider.get_bars(symbol=symbol, timeframe=timeframe, limit=300)
+        
+        # OPTIMAL BAR HESAPLAMA: Timeframe'e göre en uygun veri derinliği
+        tf_min_bars = {
+            '1m': 500, '5m': 500, '15m': 400,
+            '1h': 300, '4h': 250, '1d': 200, '1w': 150
+        }
+        limit = tf_min_bars.get(timeframe, 300)
+        
+        bars = await provider.get_bars(symbol=symbol, timeframe=timeframe, limit=limit)
         
         if not bars or len(bars) < 50:
             return JSONResponse(status_code=400, content={"error": "Yetersiz veri"})
@@ -185,11 +193,37 @@ async def analyze_full(
             "conflicts": result.conflicts,
             "used_indicators": result.timeframe_optimized_indicators,
             "pattern_context": result.pattern_context,
+            "risk_plan": None,
             "timestamp": pd.Timestamp.now().isoformat()
         }
+        
+        # Calculate Risk Plan
+        try:
+            trade_plan = risk_manager.calculate_trade_plan(
+                df=df,
+                signal_type=result.signal.value,
+                signal_score=abs(result.total_score),
+                current_price=current_price
+            )
+            response["risk_plan"] = {
+                "entry_price": float(trade_plan.entry_price),
+                "stop_loss": round(float(trade_plan.stop_loss), 2),
+                "take_profit_1": round(float(trade_plan.take_profit_1), 2),
+                "take_profit_2": round(float(trade_plan.take_profit_2), 2),
+                "take_profit_3": round(float(trade_plan.take_profit_3), 2),
+                "position_size_pct": round(float(trade_plan.position_size_pct), 2),
+                "risk_reward_ratio": round(float(trade_plan.risk_reward_ratio), 2),
+                "expected_hold_time": trade_plan.expected_hold_time,
+                "risk_level": trade_plan.risk_level.value,
+                "notes": trade_plan.notes
+            }
+        except Exception as rp_error:
+            logger.warning(f"Risk plan calculation failed: {rp_error}")
+            response["risk_plan"] = {"error": str(rp_error)}
         
         return response
         
     except Exception as e:
         logger.error(f"Fusion analysis error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        import traceback
+        return JSONResponse(status_code=500, content={"error": str(e), "traceback": traceback.format_exc()})
