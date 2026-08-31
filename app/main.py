@@ -11,6 +11,7 @@ from app.db.session import init_db
 from app.db.seed import seed_assets
 from app.scheduler import start_scheduler, stop_scheduler
 from app.engine.signal_fusion_v2 import SignalFusionEngine
+from app.engine.risk_manager import RiskManager
 import logging
 import pandas as pd
 import numpy as np
@@ -18,8 +19,9 @@ import numpy as np
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize fusion engine
+# Initialize engines
 fusion_engine = SignalFusionEngine()
+risk_manager = RiskManager()
 
 
 @asynccontextmanager
