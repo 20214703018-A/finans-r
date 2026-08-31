@@ -1,17 +1,42 @@
+```gitignore
+# Compiled Python files
+*.pyc
 __pycache__/
-*.py[cod]
-*.pyo
-.venv/
+
+# Dependencies
 venv/
+.venv/
 .env
-*.db
-*.sqlite
-.DS_Store
-.mypy_cache/
-.pytest_cache/
+.env.local
+*.env.*
+
+# Logs
+*.log
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# Build artifacts
 dist/
 build/
-models/*.pt
-models/*.onnx
-alembic/versions/*.py
-!alembic/versions/.gitkeep
+target/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# MyPy cache
+.mypy_cache/
+
+# Pytest cache
+.pytest_cache/
+```

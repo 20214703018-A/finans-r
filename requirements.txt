@@ -24,3 +24,10 @@ Pillow==11.3.0
 pyarrow==21.0.0
 scikit-learn==1.6.1
 lightgbm==4.6.0
+
+# Additional financial libraries for enhanced analysis
+ta-lib>=0.4.0
+pandas-ta>=0.3.14b0
+yfinance>=0.2.40
+ccxt>=4.0.0  # Crypto exchange API
+freqtrade-client>=2024.1  # Trading bot library
